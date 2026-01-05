@@ -27,6 +27,8 @@
   "private": true,
   "devDependencies": {
     "@babel/plugin-proposal-decorators": "^7.28.0",
-    "babel-preset-expo": "^54.0.9"
+    "@react-native-community/cli": "^20.0.2",
+    "babel-preset-expo": "^54.0.9",
+    "react-native-gesture-handler": "^2.30.0"
   }
 }

@@ -3,16 +3,18 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, ActivityIndicator, Alert, Text } from 'react-native';
 import { GiftedChat, Bubble, InputToolbar } from 'react-native-gifted-chat';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { withObservables } from '@nozbe/watermelondb/react';
 import { database } from '../../db';
+import { GoogleGenAI } from '@google/genai';
 
 // --- CONFIGURAÇÃO DA IA ---
 // 🔴 IMPORTANTE: Coloque sua chave aqui para testar
-const API_KEY = "AIzaSyBn888iCvgFzCrpx_5Q4rp5JFkmrdzB4XY"; 
-const genAI = new GoogleGenerativeAI(API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+const API_KEY = process.env.GEMINI_API_KEY; 
 
+// Debug: Verifique no terminal (console do Metro) se a chave está aparecendo
+console.log("Minha API Key é:", API_KEY ? "Carregada (começa com " + API_KEY.substring(0,5) + ")" : "NÃO CARREGADA");
+
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const ChatScreen = ({ cycles, logs, user }) => {
   const [messages, setMessages] = useState([]);
   const [isTyping, setIsTyping] = useState(false);
