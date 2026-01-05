@@ -4,6 +4,7 @@ import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { withObservables } from '@nozbe/watermelondb/react';
 import { database } from '../../db'; // Importando nosso banco
+import SymptomModal from '../../components/SymptomModal'; // Importando o Modal
 
 // --- Configuração de Idioma (PT-BR) ---
 LocaleConfig.locales['pt-br'] = {
@@ -16,19 +17,18 @@ LocaleConfig.locales['pt-br'] = {
 LocaleConfig.defaultLocale = 'pt-br';
 
 // --- Componente Visual ---
-// Recebe 'cycles' e 'logs' automaticamente do banco de dados via withObservables
 const CalendarScreen = ({ cycles, logs }) => {
   const [selectedDate, setSelectedDate] = useState('');
+  const [isModalVisible, setModalVisible] = useState(false); // Controle do Modal
 
   // Lógica para transformar os dados do Banco no formato que o Calendário entende
-  // O useMemo evita recálculos desnecessários deixando o app rápido
   const markedDates = useMemo(() => {
     const marks = {};
 
     // 1. Pintar os Ciclos (Menstruação)
     cycles.forEach(cycle => {
       const start = new Date(cycle.startDate);
-      // Simulação: Vamos supor 5 dias de fluxo para visualização (no futuro será dinâmico)
+      // Simulação: Vamos supor 5 dias de fluxo
       for (let i = 0; i < 5; i++) {
         const d = new Date(start);
         d.setDate(start.getDate() + i);
@@ -43,27 +43,41 @@ const CalendarScreen = ({ cycles, logs }) => {
       }
     });
 
-    // 2. Pintar a data selecionada pelo usuário
+    // 2. Pintar dias que têm logs (Sintomas registrados)
+    // Se o dia tiver log, colocamos uma bolinha (dot) roxa
+    logs.forEach(log => {
+        // Converter timestamp/data para string YYYY-MM-DD
+        const logDate = new Date(log.date);
+        const logString = logDate.toISOString().split('T')[0];
+        
+        if (!marks[logString]) {
+            marks[logString] = {};
+        }
+        marks[logString].marked = true;
+        marks[logString].dotColor = 'purple';
+    });
+
+    // 3. Pintar a data selecionada pelo usuário
     if (selectedDate) {
       marks[selectedDate] = { 
-        ...marks[selectedDate], // Mantém a cor de fundo se já tiver
+        ...marks[selectedDate], 
         selected: true, 
         selectedColor: '#4ECDC4' 
       };
     }
 
     return marks;
-  }, [cycles, selectedDate]);
+  }, [cycles, logs, selectedDate]);
 
-  // Função para testar a gravação no banco
+  // Função para testar a gravação no banco (Debug)
   const handleStartCycleToday = async () => {
     try {
       await database.write(async () => {
         await database.get('cycles').create(cycle => {
           cycle.startDate = new Date(); // Hoje
           cycle.status = 'current';
-          cycle.userId = 'user_local'; // Placeholder
-          cycle.endDatePredicted = new Date(Date.now() + 28 * 24 * 60 * 60 * 1000); // +28 dias
+          cycle.userId = 'user_local'; 
+          cycle.endDatePredicted = new Date(Date.now() + 28 * 24 * 60 * 60 * 1000); 
         });
       });
       Alert.alert("Sucesso", "Ciclo iniciado hoje! O calendário deve atualizar sozinho.");
@@ -74,7 +88,7 @@ const CalendarScreen = ({ cycles, logs }) => {
 
   const onDayPress = (day) => {
     setSelectedDate(day.dateString);
-    Alert.alert("Data", `Selecionado: ${day.dateString}`);
+    setModalVisible(true); // Abre o modal ao clicar no dia
   };
 
   return (
@@ -102,10 +116,22 @@ const CalendarScreen = ({ cycles, logs }) => {
       </TouchableOpacity>
 
       <View style={styles.legendContainer}>
-        <Text style={styles.legendText}>🔴 Menstruação (Dados Reais do DB)</Text>
-        <Text style={styles.legendText}>🔵 Selecionado</Text>
-        <Text style={styles.debugText}>Registros no Banco: {cycles.length}</Text>
+        <Text style={styles.legendText}>🔴 Menstruação</Text>
+        <Text style={styles.legendText}>🟣 Dia com Registro (Sintoma)</Text>
+        <Text style={styles.debugText}>Registros de Ciclos: {cycles.length}</Text>
+        <Text style={styles.debugText}>Registros de Sintomas: {logs.length}</Text>
       </View>
+
+      {/* Modal de Sintomas */}
+      <SymptomModal 
+        visible={isModalVisible}
+        date={selectedDate}
+        onClose={() => setModalVisible(false)}
+        onSave={() => {
+          console.log("Log salvo e interface atualizada via Observable!");
+        }}
+      />
+
     </SafeAreaView>
   );
 };
@@ -117,18 +143,17 @@ const styles = StyleSheet.create({
   calendarContainer: { borderRadius: 10, elevation: 4, backgroundColor: 'white', overflow: 'hidden' },
   legendContainer: { marginTop: 20, padding: 10, backgroundColor: '#f9f9f9', borderRadius: 8 },
   legendText: { fontSize: 14, marginBottom: 5, color: '#555' },
-  debugText: { fontSize: 12, marginTop: 10, color: '#999', fontStyle: 'italic' },
+  debugText: { fontSize: 12, marginTop: 5, color: '#999', fontStyle: 'italic' },
   button: {
     backgroundColor: '#FF6B6B', padding: 15, borderRadius: 10, marginTop: 20, alignItems: 'center'
   },
   buttonText: { color: 'white', fontWeight: 'bold', fontSize: 16 }
 });
 
-// --- Conexão com o Banco de Dados (A Mágica) ---
-// O withObservables conecta as tabelas às props do componente
+// --- Conexão com o Banco de Dados ---
 const enhance = withObservables([], () => ({
-  cycles: database.get('cycles').query(), // Observa TUDO da tabela cycles
-  logs: database.get('daily_logs').query(), // Observa TUDO da tabela daily_logs
+  cycles: database.get('cycles').query(), 
+  logs: database.get('daily_logs').query(), 
 }));
 
 export default enhance(CalendarScreen);
